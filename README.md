@@ -78,6 +78,14 @@ in the Linux environment that supplies their infrastructure prerequisites.
 Detailed preflight and behavioral checks are in
 [Linux validation](docs/linux-validation.md).
 
+## Jenkins
+
+The included `Jenkinsfile` runs the Java 17 and Maven 3.6.3-compatible reactor
+verification on a Linux agent. Jenkins must define tools named `jdk17` and
+`maven-3.6.3`, or the neutral tool names can be adjusted for the installation.
+The public pipeline deliberately performs no artifact deployment, release
+tagging, credential binding, or environment-specific scanning.
+
 ## Packaging flattened executable JARs
 
 Applications that use Maven Assembly to unpack all runtime dependencies into a
