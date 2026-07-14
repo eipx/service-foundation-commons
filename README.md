@@ -78,6 +78,14 @@ in the Linux environment that supplies their infrastructure prerequisites.
 Detailed preflight and behavioral checks are in
 [Linux validation](docs/linux-validation.md).
 
+## Packaging flattened executable JARs
+
+Applications that use Maven Assembly to unpack all runtime dependencies into a
+single JAR must merge Java service-provider descriptors. Otherwise, providers
+such as gRPC name resolvers can overwrite one another according to dependency
+order. See the sanitized
+[Maven Assembly service-loader example](examples/maven-assembly-service-loader/README.md).
+
 ## Release model
 
 Keep `0.1.x-SNAPSHOT` versions while compatibility is being established. Promote
