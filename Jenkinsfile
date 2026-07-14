@@ -15,7 +15,6 @@ pipeline {
 
     environment {
         CI_MAVEN_ARGS = '--batch-mode --no-transfer-progress'
-        PROJECT_REVISION = '0.1.0-SNAPSHOT'
     }
 
     stages {
@@ -28,7 +27,7 @@ pipeline {
 
         stage('Verify') {
             steps {
-                sh 'mvn ${CI_MAVEN_ARGS} -Drevision=${PROJECT_REVISION} clean verify'
+                sh 'mvn ${CI_MAVEN_ARGS} clean verify'
             }
         }
     }
