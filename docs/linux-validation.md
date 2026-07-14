@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - JDK 17 selected by `JAVA_HOME`.
-- Maven 3.8.6 or newer.
+- Maven 3.6.3 or newer.
 - Access and credentials for every Maven repository configured by the build.
 - The library and consumer project on the same Linux host, or a shared snapshot
   repository available to both builds.

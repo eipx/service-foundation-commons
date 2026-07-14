@@ -35,6 +35,7 @@ Consumer service
 ## Supported baseline
 
 - Java 17
+- Apache Maven 3.6.3 or newer
 - Spring Boot 3.3.5
 - gRPC 1.68.1
 - Protobuf 3.25.5
