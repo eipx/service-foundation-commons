@@ -30,7 +30,7 @@ class LegacyGrpcPropertiesCompatibilityTest {
 
         GrpcServerProperties properties = new Binder(ConfigurationPropertySources.from(sources))
                 .bind("grpc.server", Bindable.of(GrpcServerProperties.class))
-                .orElseThrow();
+                .get();
 
         assertEquals(8443, properties.getPort());
         assertTrue(properties.getSecurity().isEnabled());
