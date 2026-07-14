@@ -1,0 +1,4 @@
+io.github.eipx.servicefoundation.commons.observability.LoggingAutoConfiguration
+io.github.eipx.servicefoundation.commons.observability.metrics.MetricsAutoConfiguration
+io.github.eipx.servicefoundation.commons.observability.metrics.SystemMetricsAutoConfiguration
+io.github.eipx.servicefoundation.commons.observability.tracing.TrackingAutoConfiguration

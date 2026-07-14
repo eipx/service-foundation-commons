@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Appender named "EVENT_LOG" that sends the events to the monitoring microservice instance in | separated format.
+    The format and content of the events respect their definition in the configured microservice specification.
+    Note: If TLS is needed, please use logback-event-appender-tls.xml
+
+    To work, the following property must be defined in the Spring environment:
+
+        monitoring.event.url=127.0.0.1:5555
+-->
+<included>
+    <springProperty name="remoteEnabled" source="monitoring.event.remote.enabled"/>
+    <springProperty name="event.url" source="monitoring.event.url" defaultValue="event-collector:5002"/>
+    <appender name="EVENT_LOG" class="io.github.eipx.servicefoundation.commons.observability.appender.DisableableLogstashTcpSocketAppender">
+        <enabled>${remoteEnabled}</enabled>
+        <destination>${event.url}</destination>
+        <ringBufferSize>16384</ringBufferSize>
+        <writeBufferSize>0</writeBufferSize>
+        <keepAliveDuration>10 seconds</keepAliveDuration>
+        <reconnectionDelay>100</reconnectionDelay>
+        <encoder>
+            <pattern>%m%n</pattern>
+        </encoder>
+    </appender>
+</included>

@@ -1,0 +1,3 @@
+<included>
+    <property name="ACTIVITY_LOG_PATTERN" value="%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX, UTC}|%m%n"/>
+</included>

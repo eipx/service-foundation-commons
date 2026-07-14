@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>io.github.eipx.servicefoundation.commons</groupId>
+        <artifactId>service-foundation-commons-parent</artifactId>
+        <version>${revision}</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>service-foundation-commons-bom</artifactId>
+    <packaging>pom</packaging>
+    <name>Service Foundation Commons :: BOM</name>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>io.github.eipx.servicefoundation.commons</groupId>
+                <artifactId>service-foundation-commons-api</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.eipx.servicefoundation.commons</groupId>
+                <artifactId>service-foundation-commons-core-autoconfigure</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.eipx.servicefoundation.commons</groupId>
+                <artifactId>service-foundation-commons-grpc-server</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.eipx.servicefoundation.commons</groupId>
+                <artifactId>service-foundation-commons-observability</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.eipx.servicefoundation.commons</groupId>
+                <artifactId>service-foundation-commons-spring-boot-starter</artifactId>
+                <version>${revision}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+</project>

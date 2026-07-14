@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    TLS appender
+
+    Appender named "EVENT_LOG" that sends the events to the monitoring microservice instance in | separated format.
+    The format and content of the events respect their definition in the configured microservice specification.
+
+    To work, the following property must be defined in the Spring environment:
+
+        monitoring.event.url=127.0.0.1:5555
+-->
+<included>
+    <springProperty name="remoteEnabled" source="monitoring.event.remote.enabled"/>
+    <springProperty name="event.url" source="monitoring.event.url" defaultValue="event-collector:5002"/>
+    <springProperty name="truststore.path" source="monitoring.security.truststore.path"/>
+    <springProperty name="truststore.password" source="monitoring.security.truststore.password"/>
+    <springProperty name="keystore.path" source="monitoring.security.keystore.path"/>
+    <springProperty name="keystore.password" source="monitoring.security.keystore.password"/>
+    <appender name="EVENT_LOG" class="io.github.eipx.servicefoundation.commons.observability.appender.DisableableLogstashTcpSocketAppender">
+        <enabled>${remoteEnabled}</enabled>
+        <destination>${event.url}</destination>
+        <ringBufferSize>16384</ringBufferSize>
+        <writeBufferSize>0</writeBufferSize>
+        <keepAliveDuration>10 seconds</keepAliveDuration>
+        <reconnectionDelay>100</reconnectionDelay>
+        <!-- See https://logback.qos.ch/manual/usingSSL.html for more information -->
+        <ssl>
+            <trustStore>
+                <location>${truststore.path}</location>
+                <password>${truststore.password}</password>
+                <type>PKCS12</type>
+            </trustStore>
+            <keyStore>
+                <location>${keystore.path}</location>
+                <password>${keystore.password}</password>
+                <type>PKCS12</type>
+            </keyStore>
+        </ssl>
+        <encoder>
+            <pattern>%m%n</pattern>
+        </encoder>
+    </appender>
+</included>

@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Appender named "LOGSTASH" that sends the logs to a ssl-enabled logstash instance in JSON format.
+    The format and content of the logs respect their definition in the configured microservice specification.
+
+    To work, the following property must be defined in the Spring environment:
+
+        monitoring.logstash.url=127.0.0.1:5555
+        monitoring.security.truststore.path=
+        monitoring.security.truststore.password=
+        monitoring.security.truststore.path=
+        monitoring.security.truststore.password=
+
+    Trust and key stores must be PKCS#12 keystores.
+
+    On the logstash side, the following input configuration can be used:
+        input {
+            tcp {
+                port => 12345
+                codec => json
+                ssl_enable => true
+                ssl_cert => "path/to/crt"
+                ssl_cert => "<path_to_crt>"
+                ssl_key => "<path_to_key>"
+                ssl_key_passphrase => "<passphrase>"
+                ssl_verify => true
+            }
+        }
+-->
+<included>
+    <springProperty name="service.name" source="spring.application.name" defaultValue="unknown"/>
+    <springProperty name="service.version" source="spring.application.version" defaultValue="unknown"/>
+    <springProperty name="enabled" source="monitoring.logstash.enabled"/>
+    <springProperty name="logstash.url" source="monitoring.logstash.url" defaultValue="log-collector:5000"/>
+    <springProperty name="truststore.path" source="monitoring.security.truststore.path"/>
+    <springProperty name="truststore.password" source="monitoring.security.truststore.password"/>
+    <springProperty name="keystore.path" source="monitoring.security.keystore.path"/>
+    <springProperty name="keystore.password" source="monitoring.security.keystore.password"/>
+    <appender name="LOGSTASH" class="io.github.eipx.servicefoundation.commons.observability.appender.DisableableLogstashTcpSocketAppender">
+        <enabled>${enabled}</enabled>
+        <destination>${logstash.url}</destination>
+        <ringBufferSize>16384</ringBufferSize>
+        <writeBufferSize>0</writeBufferSize>
+        <keepAliveDuration>10 seconds</keepAliveDuration>
+        <reconnectionDelay>100</reconnectionDelay>
+        <!-- See https://logback.qos.ch/manual/usingSSL.html for more information -->
+        <ssl>
+            <trustStore>
+                <location>${truststore.path}</location>
+                <password>${truststore.password}</password>
+                <type>PKCS12</type>
+            </trustStore>
+            <keyStore>
+                <location>${keystore.path}</location>
+                <password>${keystore.password}</password>
+                <type>PKCS12</type>
+            </keyStore>
+        </ssl>
+        <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+            <providers>
+                <timestamp>
+                    <pattern>yyyy-MM-dd'T'HH:mm:ss.SSSXXX</pattern>
+                    <timeZone>UTC</timeZone>
+                </timestamp>
+                <mdc/>
+                <version/>
+                <pattern>
+                    <pattern>
+                        {
+                        "service_name": "${service.name}",
+                        "service_version": "${service.version}"
+                        }
+                    </pattern>
+                </pattern>
+                <logLevel/>
+                <threadName/>
+                <loggerName/>
+                <message/>
+                <logstashMarkers/>
+                <arguments/>
+                <stackTrace/>
+            </providers>
+        </encoder>
+    </appender>
+</included>

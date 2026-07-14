@@ -1,0 +1,2 @@
+io.github.eipx.servicefoundation.commons.grpc.server.GrpcServerAutoConfiguration
+io.github.eipx.servicefoundation.commons.grpc.server.GrpcServerMetricsAutoConfiguration

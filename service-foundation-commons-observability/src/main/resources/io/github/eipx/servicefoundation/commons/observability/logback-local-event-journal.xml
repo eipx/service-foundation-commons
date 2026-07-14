@@ -1,0 +1,24 @@
+<included>
+    <springProperty name="enabled" source="monitoring.event.file.enabled"/>
+    <springProperty name="log_dir" source="log-dir" defaultValue="logs"/>
+    <springProperty name="max_files_number" source="monitoring.events.file.maximum.number" defaultValue="35"/>
+    <conversionRule conversionWord="wEx" converterClass="org.springframework.boot.logging.logback.ExtendedWhitespaceThrowableProxyConverter"/>
+    <appender name="LOCAL_EVENT_JOURNAL" class="io.github.eipx.servicefoundation.commons.observability.appender.DisableableRollingFileAppender">
+        <enabled>${enabled}</enabled>
+        <encoder>
+            <pattern>%m%n</pattern>
+        </encoder>
+        <rollingPolicy class="io.github.eipx.servicefoundation.commons.observability.rolling.FixedWindowWithDateRollingPolicy">
+            <fileNamePattern>${log_dir}/events-%d{yyyyMMdd-HHmmssSSS, UTC}.log</fileNamePattern>
+            <maxHistory>${max_files_number}</maxHistory>
+        </rollingPolicy>
+        <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
+            <MaxFileSize>10MB</MaxFileSize>
+            <checkIncrement>0millisecond</checkIncrement>
+        </triggeringPolicy>
+    </appender>
+    <logger name="journal" level="info" additivity="false">
+        <appender-ref ref="LOCAL_EVENT_JOURNAL"/>
+        <appender-ref ref="EVENT_LOG"/>
+    </logger>
+</included>

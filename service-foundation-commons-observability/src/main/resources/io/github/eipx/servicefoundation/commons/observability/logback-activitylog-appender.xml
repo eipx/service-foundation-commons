@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Appender named "ACTIVITY_LOG" that sends the logs to the monitoring microservice instance in | separated format.
+    The format and content of the logs respect their definition in the configured microservice specification.
+    Note: If TLS is needed, please use logback-activitylog-appender-tls.xml
+
+    To work, the following property must be defined in the Spring environment:
+
+        monitoring.activity.url=127.0.0.1:5555
+-->
+<included>
+    <springProperty name="remoteEnabled" source="monitoring.activity.remote.enabled"/>
+    <springProperty name="activity.url" source="monitoring.activity.url" defaultValue="activity-collector:5001"/>
+    <appender name="ACTIVITY_LOG" class="io.github.eipx.servicefoundation.commons.observability.appender.DisableableLogstashTcpSocketAppender">
+        <enabled>${remoteEnabled}</enabled>
+        <destination>${activity.url}</destination>
+        <ringBufferSize>16384</ringBufferSize>
+        <writeBufferSize>0</writeBufferSize>
+        <keepAliveDuration>10 seconds</keepAliveDuration>
+        <reconnectionDelay>100</reconnectionDelay>
+        <encoder>
+            <pattern>${ACTIVITY_LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+</included>

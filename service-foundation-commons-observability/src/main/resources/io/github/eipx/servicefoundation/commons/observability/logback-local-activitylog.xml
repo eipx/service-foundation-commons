@@ -1,0 +1,24 @@
+<included>
+    <springProperty name="fileEnabled" source="monitoring.activity.file.enabled"/>
+    <springProperty name="log_dir" source="log-dir" defaultValue="logs"/>
+    <springProperty name="max_files_number" source="monitoring.activity.file.maximum.number" defaultValue="35"/>
+    <conversionRule conversionWord="wEx" converterClass="org.springframework.boot.logging.logback.ExtendedWhitespaceThrowableProxyConverter"/>
+    <appender name="LOCAL_ACTIVITY_LOG" class="io.github.eipx.servicefoundation.commons.observability.appender.DisableableRollingFileAppender">
+        <enabled>${fileEnabled}</enabled>
+        <encoder>
+            <pattern>${ACTIVITY_LOG_PATTERN}</pattern>
+        </encoder>
+        <rollingPolicy class="io.github.eipx.servicefoundation.commons.observability.rolling.FixedWindowWithDateRollingPolicy">
+            <fileNamePattern>${log_dir}/activity-%d{yyyyMMdd-HHmmssSSS, UTC}.log</fileNamePattern>
+            <maxHistory>${max_files_number}</maxHistory>
+        </rollingPolicy>
+        <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
+            <MaxFileSize>10MB</MaxFileSize>
+            <checkIncrement>0millisecond</checkIncrement>
+        </triggeringPolicy>
+    </appender>
+    <logger name="activity" level="info" additivity="false">
+        <appender-ref ref="LOCAL_ACTIVITY_LOG"/>
+        <appender-ref ref="ACTIVITY_LOG"/>
+    </logger>
+</included>
