@@ -35,6 +35,7 @@ Consumer service
 ## Supported baseline
 
 - Java 17
+- Apache Maven 3.6.3 or newer
 - Spring Boot 3.3.5
 - gRPC 1.68.1
 - Protobuf 3.25.5
@@ -76,6 +77,22 @@ in the Linux environment that supplies their infrastructure prerequisites.
 
 Detailed preflight and behavioral checks are in
 [Linux validation](docs/linux-validation.md).
+
+## Jenkins
+
+The included `Jenkinsfile` runs the Java 17 and Maven 3.6.3-compatible reactor
+verification on a Linux agent. Jenkins must define tools named `jdk17` and
+`maven-3.6.3`, or the neutral tool names can be adjusted for the installation.
+The public pipeline deliberately performs no artifact deployment, release
+tagging, credential binding, or environment-specific scanning.
+
+## Packaging flattened executable JARs
+
+Applications that use Maven Assembly to unpack all runtime dependencies into a
+single JAR must merge Java service-provider descriptors. Otherwise, providers
+such as gRPC name resolvers can overwrite one another according to dependency
+order. See the sanitized
+[Maven Assembly service-loader example](examples/maven-assembly-service-loader/README.md).
 
 ## Release model
 

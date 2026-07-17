@@ -11,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.lang.Nullable;
 
+import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
@@ -27,12 +28,12 @@ import io.grpc.netty.NettyServerBuilder;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 import static io.grpc.ServerInterceptors.intercept;
-import static io.grpc.internal.GrpcUtil.ACCEPT_ENCODING_SPLITTER;
-import static io.grpc.internal.GrpcUtil.MESSAGE_ACCEPT_ENCODING_KEY;
-import static io.grpc.internal.GrpcUtil.US_ASCII;
 
 public class NettyGrpcServerFactory implements GrpcServerFactory {
 
+    private static final Splitter ACCEPT_ENCODING_SPLITTER = Splitter.on(',').trimResults();
+    private static final Metadata.Key<String> MESSAGE_ACCEPT_ENCODING_KEY =
+            Metadata.Key.of("grpc-accept-encoding", Metadata.ASCII_STRING_MARSHALLER);
     private static final Logger LOGGER = LoggerFactory.getLogger(NettyGrpcServerFactory.class);
 
     private final GrpcServerProperties properties;
@@ -154,10 +155,10 @@ public class NettyGrpcServerFactory implements GrpcServerFactory {
                 ServerCall<ReqT, RespT> call,
                 Metadata headers,
                 ServerCallHandler<ReqT, RespT> next) {
-            byte[] messageAcceptEncoding = headers.get(MESSAGE_ACCEPT_ENCODING_KEY);
+            String messageAcceptEncoding = headers.get(MESSAGE_ACCEPT_ENCODING_KEY);
             if (messageAcceptEncoding != null) {
                 Set<String> acceptedEncodings = ImmutableSet.copyOf(
-                        ACCEPT_ENCODING_SPLITTER.split(new String(messageAcceptEncoding, US_ASCII)));
+                        ACCEPT_ENCODING_SPLITTER.split(messageAcceptEncoding));
                 Sets.intersection(compressorEncodings, acceptedEncodings)
                         .stream()
                         .findFirst()
