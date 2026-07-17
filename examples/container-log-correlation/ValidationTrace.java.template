@@ -1,0 +1,272 @@
+package org.example.validation.it;
+
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import org.example.validation.ValidationTypes;
+import org.example.validation.ValidationTypes.OperationRequest;
+import org.example.validation.ValidationTypes.OperationResponse;
+import org.example.validation.api.ValidationGrpc;
+import io.grpc.ManagedChannel;
+import org.testcontainers.containers.Container;
+import org.testcontainers.containers.GenericContainer;
+
+import java.io.IOException;
+import java.time.Duration;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
+
+/**
+ * Correlates one validation call with the primary and SECONDARY records it produces.
+ */
+final class ValidationTrace {
+    private final ThreadLocal<Observation> current = new ThreadLocal<>();
+
+    Client bind(
+            String contextName,
+            GenericContainer<?> container,
+            ReentrantLock validationLock,
+            ManagedChannel channel) {
+        return new Client(
+                contextName,
+                validationLock,
+                ValidationGrpc.newBlockingStub(channel),
+                new ContainerLogObserver(contextName, container));
+    }
+
+    String primaryFor(OperationRequest request, OperationResponse response) {
+        return require(request, response).primaryRecord();
+    }
+
+    String secondaryTail(int lineCount) {
+        if (lineCount <= 0) {
+            throw new IllegalArgumentException("lineCount must be greater than zero");
+        }
+
+        Observation observation = require();
+        List<String> events = observation.secondaryEvents();
+        if (events.size() < lineCount) {
+            throw new AssertionError("Expected at least " + lineCount + " SECONDARY event(s) for correlation identifier "
+                    + observation.request().getCorrelationId() + " at " + observation.request().getEventTime()
+                    + " in the " + observation.contextName() + " context, but captured " + events.size());
+        }
+        return String.join(System.lineSeparator(), events.subList(events.size() - lineCount, events.size()));
+    }
+
+    private Observation require(OperationRequest request, OperationResponse response) {
+        Observation observation = require();
+        if (observation.request() != request) {
+            throw new AssertionError("The primary record belongs to correlation identifier "
+                    + observation.request().getCorrelationId() + ", not " + request.getCorrelationId());
+        }
+        if (observation.response() != response) {
+            throw new AssertionError("The primary record does not belong to the supplied validation response for correlation identifier "
+                    + request.getCorrelationId());
+        }
+        return observation;
+    }
+
+    private Observation require() {
+        Observation observation = current.get();
+        if (observation == null) {
+            throw new AssertionError("No completed validation trace is available");
+        }
+        return observation;
+    }
+
+    final class Client {
+        private final String contextName;
+        private final ReentrantLock validationLock;
+        private final ValidationGrpc.ValidationBlockingStub delegate;
+        private final ContainerLogObserver logs;
+
+        private Client(
+                String contextName,
+                ReentrantLock validationLock,
+                ValidationGrpc.ValidationBlockingStub delegate,
+                ContainerLogObserver logs) {
+            this.contextName = contextName;
+            this.validationLock = validationLock;
+            this.delegate = delegate;
+            this.logs = logs;
+        }
+
+        OperationResponse validateUsage(OperationRequest request) {
+            validationLock.lock();
+            try {
+                current.remove();
+                Snapshot before = logs.snapshot();
+                OperationResponse response = delegate.validateUsage(request);
+                current.set(logs.await(request, response, before));
+                return response;
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw observationFailure(request, e);
+            } catch (IOException e) {
+                throw observationFailure(request, e);
+            } finally {
+                validationLock.unlock();
+            }
+        }
+
+        ValidationTypes.HealthCheckResponse check(ValidationTypes.HealthCheckRequest request) {
+            return delegate.check(request);
+        }
+
+        private AssertionError observationFailure(OperationRequest request, Exception cause) {
+            return new AssertionError("Could not trace validation request " + request.getCorrelationId()
+                    + " in the " + contextName + " context", cause);
+        }
+    }
+
+    private record Observation(
+            String contextName,
+            OperationRequest request,
+            OperationResponse response,
+            String primaryRecord,
+            List<String> secondaryEvents) {
+        private Observation {
+            secondaryEvents = List.copyOf(secondaryEvents);
+        }
+    }
+
+    private record Snapshot(Cursor primary, Cursor secondary) {
+    }
+
+    private record Cursor(String fileIdentity, long byteOffset) {
+    }
+
+    private static final class ContainerLogObserver {
+        private static final String PRIMARY_LOG = "/srv/example-service/logs/primary/primary-1.log";
+        private static final String SECONDARY_LOG = "/srv/example-service/logs/secondary/secondary.log";
+        private static final Duration TIMEOUT = Duration.ofSeconds(5);
+        private static final long POLL_INTERVAL_MILLIS = 25;
+
+        private final String contextName;
+        private final GenericContainer<?> container;
+
+        private ContainerLogObserver(String contextName, GenericContainer<?> container) {
+            this.contextName = contextName;
+            this.container = container;
+        }
+
+        private Snapshot snapshot() throws IOException, InterruptedException {
+            return new Snapshot(cursor(PRIMARY_LOG), cursor(SECONDARY_LOG));
+        }
+
+        private Observation await(
+                OperationRequest request,
+                OperationResponse response,
+                Snapshot before) throws IOException, InterruptedException {
+            long deadline = System.nanoTime() + TIMEOUT.toNanos();
+            List<String> primaryLines = Collections.emptyList();
+            String primaryRecord = null;
+
+            do {
+                if (primaryRecord == null) {
+                    primaryLines = appendedLines(PRIMARY_LOG, before.primary());
+                    primaryRecord = primaryLines.stream()
+                            .filter(line -> isPrimaryRecordFor(request, line))
+                            .findFirst()
+                            .orElse(null);
+                }
+                if (primaryRecord != null) {
+                    // Both service handlers write SECONDARY before the matching primary record.
+                    List<String> secondaryEvents = appendedLines(SECONDARY_LOG, before.secondary()).stream()
+                            .filter(line -> isSecondaryEventFor(request, line))
+                            .collect(Collectors.toList());
+                    return new Observation(contextName, request, response, primaryRecord, secondaryEvents);
+                }
+
+                Thread.sleep(POLL_INTERVAL_MILLIS);
+            } while (System.nanoTime() < deadline);
+
+            List<String> secondaryLines = appendedLines(SECONDARY_LOG, before.secondary());
+            throw new AssertionError("Timed out waiting for the primary record produced by validation of correlation identifier "
+                    + request.getCorrelationId() + " at " + request.getEventTime() + " in the " + contextName
+                    + " context. Newly appended primary lines:\n"
+                    + String.join(System.lineSeparator(), primaryLines)
+                    + "\nNewly appended SECONDARY lines:\n"
+                    + String.join(System.lineSeparator(), secondaryLines));
+        }
+
+        private Cursor cursor(String logPath) throws IOException, InterruptedException {
+            Container.ExecResult result = container.execInContainer(
+                    "sh", "-c",
+                    "if [ -f \"$1\" ]; then stat -c '%d:%i %s' \"$1\"; else printf 'missing 0'; fi",
+                    "capture-log-cursor", logPath);
+            requireSuccess(result, "capture a cursor for", logPath);
+
+            String[] fields = result.getStdout().trim().split("\\s+");
+            if (fields.length != 2) {
+                throw new IOException("Unexpected cursor for " + logPath + " in the "
+                        + contextName + " context: " + result.getStdout());
+            }
+            try {
+                return new Cursor(fields[0], Long.parseLong(fields[1]));
+            } catch (NumberFormatException e) {
+                throw new IOException("Invalid cursor for " + logPath + " in the "
+                        + contextName + " context: " + result.getStdout(), e);
+            }
+        }
+
+        private List<String> appendedLines(String logPath, Cursor cursor)
+                throws IOException, InterruptedException {
+            Container.ExecResult result = container.execInContainer(
+                    "sh", "-c",
+                    "if [ ! -f \"$1\" ]; then exit 0; fi; "
+                            + "exec 3<\"$1\" || exit 0; "
+                            + "metadata=$(stat -Lc '%d:%i %s' /proc/self/fd/3) || exit $?; "
+                            + "identity=${metadata% *}; "
+                            + "size=${metadata##* }; "
+                            + "start=1; "
+                            + "if [ \"$identity\" = \"$2\" ] && [ \"$size\" -ge \"$3\" ]; "
+                            + "then start=$(( $3 + 1 )); fi; "
+                            + "tail -c +\"$start\" <&3",
+                    "read-appended-log", logPath, cursor.fileIdentity(), Long.toString(cursor.byteOffset()));
+            requireSuccess(result, "read appended content from", logPath);
+
+            String appended = result.getStdout();
+            int lastLineBreak = appended.lastIndexOf('\n');
+            if (lastLineBreak < 0) {
+                return Collections.emptyList();
+            }
+            return appended.substring(0, lastLineBreak + 1).lines().collect(Collectors.toList());
+        }
+
+        private void requireSuccess(Container.ExecResult result, String action, String logPath) throws IOException {
+            if (result.getExitCode() != 0) {
+                throw new IOException("Could not " + action + " " + logPath + " in the "
+                        + contextName + " context (exit " + result.getExitCode() + "): "
+                        + result.getStderr());
+            }
+        }
+
+        private static boolean isPrimaryRecordFor(OperationRequest request, String line) {
+            return line.contains("|operationRequest|")
+                    && line.contains("|" + request.getCorrelationId() + "|" + request.getEventTime() + "|");
+        }
+
+        private static boolean isSecondaryEventFor(OperationRequest request, String line) {
+            try {
+                JsonElement parsed = JsonParser.parseString(line);
+                if (!parsed.isJsonObject()) {
+                    return false;
+                }
+                JsonObject traceMessage = parsed.getAsJsonObject().getAsJsonObject("traceMessage");
+                if (traceMessage == null || !traceMessage.has("correlationId") || !traceMessage.has("traceResult")) {
+                    return false;
+                }
+                JsonObject traceResult = traceMessage.getAsJsonObject("traceResult");
+                return traceResult != null
+                        && traceResult.has("eventTime")
+                        && request.getCorrelationId().equals(traceMessage.get("correlationId").getAsString())
+                        && request.getEventTime().equals(traceResult.get("eventTime").getAsString());
+            } catch (RuntimeException ignored) {
+                return false;
+            }
+        }
+    }
+}
